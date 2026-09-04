@@ -10,13 +10,12 @@ M.A.T.S.는 FPGA 기반의 실시간 안티드론 탐지 및 조준 시스템입
 > 대한상공회의소 서울기술교육센터 온디바이스 AI 반도체 설계 1기 미니 프로젝트  
 > 개발 기간: 2026.07.13 - 2026.07.21
 
-## 결과 영상
+## YouTube Demo
 
-<p align="center">
-  <a href="https://youtu.be/_mGgUuENo0s?si=fW8PZqJXcjxNyCB9">
-    <img src="https://img.shields.io/badge/YouTube-Watch%20Demo%20Video-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch demo video on YouTube" />
-  </a>
-</p>
+아래 이미지를 클릭하면 YouTube 데모 영상으로 이동합니다.
+<a href="https://youtu.be/_mGgUuENo0s?si=fW8PZqJXcjxNyCB9">
+  <img src="https://img.shields.io/badge/YouTube-Demo%20Video-FF0000?style=flat-square&logo=youtube&logoColor=white" alt="YouTube Demo Video" />
+</a>
 
 <p align="center">
   <a href="https://youtu.be/_mGgUuENo0s?si=fW8PZqJXcjxNyCB9">
