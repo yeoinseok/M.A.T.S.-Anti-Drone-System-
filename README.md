@@ -12,7 +12,21 @@ M.A.T.S.는 FPGA 기반의 실시간 안티드론 탐지 및 조준 시스템입
 
 ## 결과 영상
 
-[![M.A.T.S. 결과 영상](https://img.youtube.com/vi/_mGgUuENo0s/hqdefault.jpg)](https://youtu.be/_mGgUuENo0s?si=fW8PZqJXcjxNyCB9)
+<p align="center">
+  <a href="https://youtu.be/_mGgUuENo0s?si=fW8PZqJXcjxNyCB9">
+    <img src="https://img.shields.io/badge/YouTube-Watch%20Demo%20Video-FF0000?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch demo video on YouTube" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://youtu.be/_mGgUuENo0s?si=fW8PZqJXcjxNyCB9">
+    <img src="https://img.youtube.com/vi/_mGgUuENo0s/hqdefault.jpg" alt="M.A.T.S. 결과 영상 썸네일" width="720" />
+  </a>
+</p>
+
+<p align="center">
+  <b>이미지 또는 YouTube 버튼을 클릭하면 시연 영상으로 이동합니다.</b>
+</p>
 
 위 영상은 카메라 입력, FPGA 영상 처리, VGA 경고 화면, PC 관제 UI가 함께
 동작하는 전체 시연 결과입니다.
