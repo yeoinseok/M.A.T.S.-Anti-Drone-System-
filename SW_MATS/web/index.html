@@ -1,0 +1,1618 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>M.A.T.S. - Military Active Tracking System</title>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #030708;
+            --radar-green: #00ff66;
+            --radar-glow: rgba(0, 255, 102, 0.3);
+            --enemy-red: #ff3333;
+            --enemy-glow: rgba(255, 51, 51, 0.4);
+            --friendly-blue: #00d2ff;
+            --friendly-glow: rgba(0, 210, 255, 0.4);
+            --panel-bg: rgba(6, 17, 16, 0.7);
+            --panel-border: #00ff6633;
+            --text-color: #e2e8f0;
+            --font-mono: 'Share Tech Mono', monospace;
+            --font-display: 'Orbitron', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: var(--font-mono);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            background-image:
+                radial-gradient(circle at center, rgba(0, 255, 102, 0.03) 0%, transparent 70%);
+        }
+
+        /* Top Header Area matching the user layout */
+        header {
+            background-color: #ffffff;
+            color: #000;
+            padding: 10px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #ccc;
+            height: 70px;
+        }
+
+        .header-left h1 {
+            font-family: var(--font-display);
+            font-size: 2.2rem;
+            font-weight: 900;
+            color: #1e293b;
+            letter-spacing: 2px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-right img {
+            height: 45px;
+        }
+
+        /* Flashing Alert Banner */
+        .alert-banner {
+            background-color: #000;
+            color: var(--enemy-red);
+            font-family: var(--font-display);
+            font-size: 1.8rem;
+            font-weight: 900;
+            text-align: center;
+            padding: 10px 0;
+            letter-spacing: 4px;
+            border-bottom: 2px solid var(--enemy-red);
+            text-shadow: 0 0 10px var(--enemy-red);
+            display: none;
+            /* Shown dynamically when enemy is detected */
+            animation: alert-flash 1s infinite alternate;
+            transition: all 0.3s ease;
+        }
+
+        .alert-banner.active {
+            display: block;
+        }
+
+        .alert-banner.critical {
+            background-color: #ff0000;
+            color: #ffffff;
+            font-size: 2.1rem;
+            animation: alert-flash-critical 0.25s infinite alternate;
+            text-shadow: 0 0 20px #ffffff, 0 0 30px #ff0000;
+            border-bottom: 4px solid #ffffff;
+            box-shadow: 0 0 25px rgba(255, 0, 0, 0.7);
+        }
+
+        @keyframes alert-flash {
+            0% {
+                background-color: #000;
+            }
+
+            100% {
+                background-color: rgba(255, 51, 51, 0.2);
+            }
+        }
+
+        @keyframes alert-flash-critical {
+            0% {
+                background-color: #800000;
+            }
+
+            100% {
+                background-color: #ff0000;
+            }
+        }
+
+        /* Main Workspace Layout */
+        main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 450px;
+            gap: 20px;
+            padding: 20px;
+            height: calc(100vh - 70px);
+            overflow: hidden;
+        }
+
+        /* Left Column: Sector Radar Display */
+        .radar-section {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            box-shadow: inset 0 0 30px rgba(0, 255, 102, 0.05);
+        }
+
+        .radar-canvas-container {
+            width: 100%;
+            height: 90%;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            position: relative;
+            padding-bottom: 20px;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* Right Column: Status & Realtime Data Panel */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+        }
+
+        .panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        }
+
+        .panel-header {
+            font-family: var(--font-display);
+            font-size: 1.1rem;
+            color: var(--radar-green);
+            border-bottom: 1px solid var(--panel-border);
+            padding-bottom: 8px;
+            margin-bottom: 15px;
+            letter-spacing: 1px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Target list style */
+        .target-list {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        .target-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(0, 255, 102, 0.1);
+            border-radius: 6px;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            transition: all 0.3s;
+        }
+
+        .target-card.enemy {
+            border-color: rgba(255, 51, 51, 0.2);
+            background: rgba(255, 51, 51, 0.02);
+        }
+
+        .target-card.friendly {
+            border-color: rgba(0, 210, 255, 0.2);
+            background: rgba(0, 210, 255, 0.02);
+        }
+
+        .drone-icon-container {
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .drone-svg {
+            width: 42px;
+            height: 42px;
+            fill: none;
+            stroke-width: 2;
+        }
+
+        .enemy .drone-svg {
+            stroke: var(--enemy-red);
+            filter: drop-shadow(0 0 4px var(--enemy-red));
+        }
+
+        .friendly .drone-svg {
+            stroke: var(--friendly-blue);
+            filter: drop-shadow(0 0 4px var(--friendly-blue));
+        }
+
+        .target-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+        }
+
+        .info-label {
+            color: #88a090;
+        }
+
+        .info-value {
+            font-weight: bold;
+        }
+
+        .enemy .info-value.status {
+            color: var(--enemy-red);
+        }
+
+        .friendly .info-value.status {
+            color: var(--friendly-blue);
+        }
+
+        /* Camera stream container */
+        .camera-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .camera-viewport {
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            background: #020506;
+            border: 1px solid rgba(0, 255, 102, 0.1);
+            border-radius: 6px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .camera-viewport img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .camera-placeholder {
+            position: absolute;
+            color: rgba(0, 255, 102, 0.4);
+            font-size: 0.95rem;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%,
+                    rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg,
+                    rgba(255, 0, 0, 0.06),
+                    rgba(0, 255, 0, 0.02),
+                    rgba(0, 0, 255, 0.06));
+            background-size: 100% 4px, 6px 100%;
+            pointer-events: none;
+        }
+
+        /* Controls */
+        .control-row {
+            display: flex;
+            gap: 10px;
+            margin-top: auto;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 10px;
+            background: transparent;
+            border: 1px solid var(--radar-green);
+            color: var(--radar-green);
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: rgba(0, 255, 102, 0.1);
+            box-shadow: 0 0 10px rgba(0, 255, 102, 0.2);
+        }
+
+        /* Slider styling */
+        .slider-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 5px;
+            font-size: 0.9rem;
+            color: #88a090;
+        }
+
+        .slider-label-row {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .range-slider {
+            width: 100%;
+            -webkit-appearance: none;
+            background: rgba(0, 255, 102, 0.1);
+            height: 6px;
+            border-radius: 3px;
+            outline: none;
+            border: 1px solid rgba(0, 255, 102, 0.2);
+        }
+
+        .range-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--radar-green);
+            cursor: pointer;
+            box-shadow: 0 0 8px var(--radar-green);
+        }
+
+        /* Mode Selector, Score Board, and Weapon Selector styles */
+        .mode-selector {
+            position: absolute;
+            bottom: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            border: 1px solid #3e4e3b;
+            background: rgba(3, 7, 8, 0.9);
+            z-index: 10;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .mode-btn {
+            padding: 8px 30px;
+            background: transparent;
+            border: none;
+            color: #3e4e3b;
+            font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            outline: none;
+        }
+
+        .mode-btn.active {
+            background: #3e4e3b;
+            color: #030708;
+        }
+
+        .mode-btn:not(.active):hover {
+            background: rgba(62, 78, 59, 0.15);
+        }
+
+        .score-board {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: none;
+            /* Hidden by default, shown in Attack Mode */
+            border: 1px solid #3e4e3b;
+            background: rgba(3, 7, 8, 0.85);
+            font-family: var(--font-mono);
+            font-size: 1.1rem;
+            font-weight: bold;
+            z-index: 10;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .score-label {
+            background: #3e4e3b;
+            color: #030708;
+            padding: 8px 16px;
+            font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .score-value {
+            color: #00ff66;
+            padding: 8px 24px;
+            font-family: var(--font-mono);
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 80px;
+        }
+
+        .weapon-selector {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            display: none;
+            /* Hidden by default, shown in Attack Mode */
+            flex-direction: column;
+            gap: 6px;
+            z-index: 10;
+        }
+
+        .weapon-tab {
+            width: 100px;
+            padding: 8px 0;
+            background: transparent;
+            border: 1px solid #3e4e3b;
+            color: #3e4e3b;
+            font-family: var(--font-mono);
+            font-size: 0.95rem;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+            outline: none;
+            border-radius: 4px;
+        }
+
+        .weapon-tab.active {
+            background: #3e4e3b;
+            color: #030708;
+            border-color: #3e4e3b;
+        }
+
+        .weapon-tab:not(.active):hover {
+            background: rgba(62, 78, 59, 0.15);
+        }
+
+        /* Reload progress HUD styles */
+        .reload-bar-container {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: none;
+            /* Hidden by default */
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            z-index: 10;
+            width: 250px;
+            font-family: var(--font-mono);
+        }
+
+        .reload-text {
+            color: #ff3333;
+            font-size: 0.9rem;
+            font-weight: bold;
+            text-shadow: 0 0 5px rgba(255, 51, 51, 0.6);
+            letter-spacing: 2px;
+            animation: reload-blink 0.8s infinite alternate;
+        }
+
+        @keyframes reload-blink {
+            0% {
+                opacity: 0.3;
+            }
+
+            100% {
+                opacity: 1.0;
+            }
+        }
+
+        .reload-progress-bg {
+            width: 100%;
+            height: 6px;
+            background: rgba(255, 51, 51, 0.15);
+            border: 1px solid rgba(255, 51, 51, 0.4);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .reload-progress {
+            width: 0%;
+            height: 100%;
+            background: #ff3333;
+            box-shadow: 0 0 8px #ff3333;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="header-left">
+            <h1>M.A.T.S.</h1>
+        </div>
+        <div class="header-right">
+            <!-- 대한상공회의소 로고 및 텍스트 플레이스홀더 -->
+            <svg width="180" height="40" viewBox="0 0 180 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect width="180" height="40" rx="4" fill="#f8fafc" />
+                <!-- Chamber gear icon representation -->
+                <circle cx="25" cy="20" r="10" stroke="#0284c7" stroke-width="3" stroke-dasharray="4 2" />
+                <circle cx="25" cy="20" r="6" fill="#0284c7" />
+                <text x="45" y="25" fill="#1e293b" font-family="'Inter', sans-serif" font-size="12"
+                    font-weight="bold">대한상공회의소</text>
+                <text x="45" y="34" fill="#64748b" font-family="'Inter', sans-serif" font-size="7">KOREA CHAMBER OF
+                    COMMERCE</text>
+            </svg>
+        </div>
+    </header>
+
+    <!-- Enemy Alert Banner -->
+    <div id="enemyAlertBanner" class="alert-banner">ENEMY DETECT !!</div>
+
+    <main>
+        <!-- Left: Sector Radar Grid -->
+        <section class="radar-section">
+            <!-- Score Board (근무 평정) -->
+            <div id="scoreBoard" class="score-board">
+                <div class="score-label">근무 평정</div>
+                <div class="score-value" id="scoreValue">1900</div>
+            </div>
+
+            <!-- Reload HUD Bar -->
+            <div id="reloadBarContainer" class="reload-bar-container">
+                <div class="reload-text">RELOADING <span id="reloadWeaponName">SM-2</span>...</div>
+                <div class="reload-progress-bg">
+                    <div id="reloadProgress" class="reload-progress"></div>
+                </div>
+            </div>
+
+            <div class="radar-canvas-container">
+                <canvas id="radarCanvas" width="600" height="400"></canvas>
+            </div>
+
+            <!-- Mode Selector (감시 모드 / 공격 모드) -->
+            <div class="mode-selector">
+                <button id="btnMonitorMode" class="mode-btn active" onclick="setMode('monitor')">감시 모드</button>
+                <button id="btnAttackMode" class="mode-btn" onclick="setMode('attack')">공격 모드</button>
+            </div>
+
+            <!-- Weapon Selector (SM-2, 12.7mm, 5.56mm) -->
+            <div id="weaponSelector" class="weapon-selector">
+                <button id="btnWeaponSM2" class="weapon-tab active" onclick="selectWeapon('SM-2')">SM-2</button>
+                <button id="btnWeapon127" class="weapon-tab" onclick="selectWeapon('12.7mm')">12.7mm</button>
+                <button id="btnWeapon556" class="weapon-tab" onclick="selectWeapon('5.56mm')">5.56mm</button>
+            </div>
+        </section>
+
+        <!-- Right: Control / Data / Video Panel -->
+        <!-- Right: Dynamic Split Target List Column -->
+        <section class="sidebar" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
+            <!-- Target Information Split Half/Half -->
+            <div class="panel"
+                style="flex: 1; display: flex; flex-direction: column; overflow: hidden; margin-bottom: 0;">
+                <div class="panel-header" style="flex-shrink: 0;">
+                    <span>DETECTED OBJECTS</span>
+                    <span id="targetCount" style="color: var(--radar-green);">ACTIVE: 0</span>
+                </div>
+                <!-- Enemy Targets (Top Half) -->
+                <div
+                    style="flex: 1; display: flex; flex-direction: column; overflow: hidden; border-bottom: 1px solid rgba(0, 255, 102, 0.15);">
+                    <div
+                        style="font-size: 0.8rem; color: #ff3333; font-weight: bold; padding: 6px 10px; background: rgba(255, 51, 51, 0.05); border-bottom: 1px dashed rgba(255, 51, 51, 0.2);">
+                        ENEMY TARGETS (적군)</div>
+                    <div id="enemyTargetList" class="target-list" style="flex: 1; overflow-y: auto; padding: 5px;">
+                        <!-- Enemy Cards will be populated dynamically -->
+                    </div>
+                </div>
+                <!-- Friendly Targets (Bottom Half) -->
+                <div style="flex: 1; display: flex; flex-direction: column; overflow: hidden;">
+                    <div
+                        style="font-size: 0.8rem; color: #00d2ff; font-weight: bold; padding: 6px 10px; background: rgba(0, 210, 255, 0.05); border-bottom: 1px dashed rgba(0, 210, 255, 0.2);">
+                        FRIENDLY TARGETS (우군)</div>
+                    <div id="friendlyTargetList" class="target-list" style="flex: 1; overflow-y: auto; padding: 5px;">
+                        <!-- Friendly Cards will be populated dynamically -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Camera Viewport Panel (Bottom Right) -->
+            <div class="panel camera-panel"
+                style="display: flex; flex-direction: column; overflow: hidden; margin-top: 15px; flex-shrink: 0;">
+                <div class="panel-header"
+                    style="flex-shrink: 0; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <span>CAMERA FEED</span>
+                    <select id="cameraSelect" onchange="onCameraChange(this.value)"
+                        style="background: rgba(0, 0, 0, 0.8); color: var(--radar-green); border: 1px solid rgba(0, 255, 102, 0.2); border-radius: 4px; padding: 2px 5px; font-family: var(--font-mono); font-size: 0.8rem; outline: none; cursor: pointer;">
+                        <option value="0">CAM 0 (기본)</option>
+                        <option value="1">CAM 1</option>
+                        <option value="2">CAM 2</option>
+                        <option value="3">CAM 3</option>
+                    </select>
+                </div>
+                <div class="camera-viewport">
+                    <img id="cameraStream" style="width: 100%; height: 100%; object-fit: cover; display: none;" />
+                    <div id="cameraPlaceholder" class="camera-placeholder"
+                        style="position: absolute; color: rgba(0, 255, 102, 0.4); font-size: 0.95rem; text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center;">
+                        <span>NO VIDEO SIGNAL</span>
+                    </div>
+                    <div class="scanlines"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Inline Drone SVG Template (Reused in JS) -->
+    <template id="droneSvgTemplate">
+        <svg class="drone-svg" viewBox="0 0 24 24">
+            <!-- Central body -->
+            <circle cx="12" cy="12" r="3" />
+            <!-- Arms -->
+            <line x1="6" y1="6" x2="18" y2="18" />
+            <line x1="6" y1="18" x2="18" y2="6" />
+            <!-- Rotors -->
+            <circle cx="6" cy="6" r="2.5" />
+            <circle cx="18" cy="6" r="2.5" />
+            <circle cx="6" cy="18" r="2.5" />
+            <circle cx="18" cy="18" r="2.5" />
+        </svg>
+    </template>
+
+    <script>
+        const canvas = document.getElementById('radarCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Game / Mode state variables
+        let currentMode = 'monitor'; // 'monitor' or 'attack'
+        let currentWeapon = 'SM-2';
+        let score = 1900;
+        let aimingAngle = -90 * Math.PI / 180; // Straight up (-90 degrees) by default
+
+        // Cooldown and weapon profiles (Rate of fire lock, rotation speed, hit points, and miss penalties)
+        const weaponConfigs = {
+            'SM-2': { cooldown: 800, scoreVal: 5, missPenalty: 10, traceColor: '#ffffff', traceWidth: 6, isMissile: true, rotationSpeed: 0.005 },
+            '12.7mm': { cooldown: 150, scoreVal: 3, missPenalty: 1, traceColor: '#ffffff', traceWidth: 3, isMissile: false, rotationSpeed: 0.010 },
+            '5.56mm': { cooldown: 80, scoreVal: 1, missPenalty: 0, traceColor: '#ffffff', traceWidth: 1.5, isMissile: false, rotationSpeed: 0.015 }
+        };
+
+        // Magazine Ammo & Reloading state profiles
+        const weaponStates = {
+            'SM-2': { ammo: 3, maxAmmo: 3, reloading: false, reloadStartTime: 0, reloadDuration: 5000, interruptedReload: false },
+            '12.7mm': { ammo: 15, maxAmmo: 15, reloading: false, reloadStartTime: 0, reloadDuration: 1800, interruptedReload: false },
+            '5.56mm': { ammo: 30, maxAmmo: 30, reloading: false, reloadStartTime: 0, reloadDuration: 1200, interruptedReload: false }
+        };
+
+        // Keyboard control tracking states
+        const keysPressed = {};
+
+        let lastFireTime = 0;
+        let activeFires = []; // { startTime, duration, angle, startX, startY, endX, endY, weapon, config }
+        let activeHits = [];  // { x, y, text, startTime, duration, targetId }
+
+        // Update ammo indicators on weapon selector tabs
+        function updateWeaponTabsUI() {
+            document.getElementById('btnWeaponSM2').innerText = `SM-2 [${weaponStates['SM-2'].reloading ? 'RELOAD' : weaponStates['SM-2'].ammo + '/' + weaponStates['SM-2'].maxAmmo}]`;
+            document.getElementById('btnWeapon127').innerText = `12.7mm [${weaponStates['12.7mm'].reloading ? 'RELOAD' : weaponStates['12.7mm'].ammo + '/' + weaponStates['12.7mm'].maxAmmo}]`;
+            document.getElementById('btnWeapon556').innerText = `5.56mm [${weaponStates['5.56mm'].reloading ? 'RELOAD' : weaponStates['5.56mm'].ammo + '/' + weaponStates['5.56mm'].maxAmmo}]`;
+        }
+
+        // Mode Switcher handler
+        window.setMode = function (mode) {
+            currentMode = mode;
+
+            // Toggle button styles
+            document.getElementById('btnMonitorMode').classList.toggle('active', mode === 'monitor');
+            document.getElementById('btnAttackMode').classList.toggle('active', mode === 'attack');
+
+            // Toggle scoreboard and weapon selector visibility
+            const displays = mode === 'attack' ? 'flex' : 'none';
+            document.getElementById('scoreBoard').style.display = displays;
+            document.getElementById('weaponSelector').style.display = displays;
+
+            // Reset score and reload states when starting attack mode
+            if (mode === 'attack') {
+                score = 1900;
+                document.getElementById('scoreValue').innerText = score;
+                for (let w in weaponStates) {
+                    weaponStates[w].ammo = weaponStates[w].maxAmmo;
+                    weaponStates[w].reloading = false;
+                    weaponStates[w].interruptedReload = false;
+                }
+                document.getElementById('reloadBarContainer').style.display = 'none';
+                updateWeaponTabsUI();
+            } else {
+                document.getElementById('reloadBarContainer').style.display = 'none';
+            }
+        };
+
+        // Weapon select handler
+        window.selectWeapon = function (weapon) {
+            const oldWeapon = currentWeapon;
+            
+            // If old weapon was reloading, interrupt it (except SM-2, which reloads in background)
+            if (weaponStates[oldWeapon].reloading) {
+                if (oldWeapon !== 'SM-2') {
+                    weaponStates[oldWeapon].reloading = false;
+                    weaponStates[oldWeapon].interruptedReload = true;
+                }
+            }
+            
+            currentWeapon = weapon;
+            
+            // If new weapon was interrupted or has 0 ammo (and is not already reloading), restart reload from beginning
+            if (!weaponStates[currentWeapon].reloading && (weaponStates[currentWeapon].interruptedReload || weaponStates[currentWeapon].ammo <= 0)) {
+                weaponStates[currentWeapon].reloading = true;
+                weaponStates[currentWeapon].reloadStartTime = Date.now();
+                weaponStates[currentWeapon].interruptedReload = false; // Reset interrupt flag
+            }
+            
+            // Toggle active classes on tabs
+            document.getElementById('btnWeaponSM2').classList.toggle('active', weapon === 'SM-2');
+            document.getElementById('btnWeapon127').classList.toggle('active', weapon === '12.7mm');
+            document.getElementById('btnWeapon556').classList.toggle('active', weapon === '5.56mm');
+            
+            updateWeaponTabsUI();
+        };
+
+        // Dynamic Radar dimension variables
+        let originX = canvas.width / 2;
+        let originY = canvas.height - 10;
+        let radarRadius = canvas.height - 30;
+
+        // Resize function to fit parent container
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            if (container) {
+                const rect = container.getBoundingClientRect();
+                canvas.width = rect.width;
+                canvas.height = rect.height;
+
+                // Recalculate dimensions
+                originX = canvas.width / 2;
+                originY = canvas.height - 15;
+                // Fits beautifully within the width and height constraints
+                radarRadius = Math.min(canvas.width / 2 - 20, canvas.height - 35);
+            }
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+        // Execute initial resize
+        resizeCanvas();
+
+        // Manual and automatic reloading handler
+        function startReload() {
+            const state = weaponStates[currentWeapon];
+            if (state.reloading) return;
+            if (state.ammo === state.maxAmmo) return; // Already full
+
+            state.reloading = true;
+            state.reloadStartTime = Date.now();
+            updateWeaponTabsUI();
+        }
+
+        // Firing executor
+        function fireWeapon() {
+            if (currentMode !== 'attack') return;
+
+            const config = weaponConfigs[currentWeapon];
+            const state = weaponStates[currentWeapon];
+
+            // If weapon is reloading, do not fire
+            if (state.reloading) return;
+
+            // If out of ammo, trigger reload
+            if (state.ammo <= 0) {
+                startReload();
+                return;
+            }
+
+            const now = Date.now();
+            // Check shot-to-shot delay cooldown
+            if (now - lastFireTime < config.cooldown) return;
+
+            lastFireTime = now;
+            state.ammo--;
+            updateWeaponTabsUI();
+
+            // Search for targeted enemy/friendly drone
+            let hitTarget = null;
+            let closestDist = 999999;
+
+            for (let id in targets) {
+                const t = targets[id];
+                if (t.stable !== 1) continue; // Shoot active stable targets (friendly or enemy)
+
+                const angleDiff = Math.abs(t.smoothedAngle - aimingAngle);
+
+                // If the target aligns within ~4.5 degrees tolerance
+                if (angleDiff < 0.08) {
+                    if (t.smoothedDist < closestDist) {
+                        closestDist = t.smoothedDist;
+                        hitTarget = t;
+                    }
+                }
+            }
+
+            let targetX, targetY;
+            if (hitTarget) {
+                targetX = originX + Math.cos(hitTarget.smoothedAngle) * hitTarget.smoothedDist;
+                targetY = originY + Math.sin(hitTarget.smoothedAngle) * hitTarget.smoothedDist;
+
+                const isFriendly = (hitTarget.type === 1);
+                let text, textColor, shadowColor;
+
+                if (isFriendly) {
+                    score = Math.max(0, score - 100);
+                    text = `-100 (아군 오사)`;
+                    textColor = 'rgba(255, 51, 51, ALPHA)';
+                    shadowColor = '#ff3333';
+                } else {
+                    score += config.scoreVal;
+                    text = `+${config.scoreVal}`;
+                    textColor = 'rgba(0, 255, 102, ALPHA)';
+                    shadowColor = '#00ff66';
+                }
+                document.getElementById('scoreValue').innerText = score;
+
+                // Score text flash visual effect
+                const scoreBox = document.getElementById('scoreBoard');
+                scoreBox.style.transform = 'scale(1.08)';
+                scoreBox.style.borderColor = isFriendly ? '#ff3333' : '#00ff66';
+                setTimeout(() => {
+                    scoreBox.style.transform = '';
+                    scoreBox.style.borderColor = '#3e4e3b';
+                }, 150);
+
+                // Explode target
+                activeHits.push({
+                    x: targetX,
+                    y: targetY,
+                    text: text,
+                    startTime: now,
+                    duration: 800,
+                    targetId: hitTarget.id,
+                    textColor: textColor,
+                    shadowColor: shadowColor
+                });
+
+                delete targets[hitTarget.id];
+            } else {
+                targetX = originX + Math.cos(aimingAngle) * radarRadius;
+                targetY = originY + Math.sin(aimingAngle) * radarRadius;
+
+                // Miss penalty
+                if (config.missPenalty > 0) {
+                    score = Math.max(0, score - config.missPenalty);
+                    document.getElementById('scoreValue').innerText = score;
+
+                    // Miss indicator showing penalty in red
+                    activeHits.push({
+                        x: targetX,
+                        y: targetY,
+                        text: `-${config.missPenalty}`,
+                        startTime: now,
+                        duration: 800,
+                        isMiss: true,
+                        textColor: 'rgba(255, 51, 51, ALPHA)',
+                        shadowColor: '#ff3333'
+                    });
+                }
+            }
+
+            // Create bullet/laser tracer line
+            activeFires.push({
+                startTime: now,
+                duration: config.isMissile ? 300 : 120,
+                angle: aimingAngle,
+                startX: originX,
+                startY: originY,
+                endX: targetX,
+                endY: targetY,
+                weapon: currentWeapon,
+                config: config
+            });
+
+            // Automatically reload if clip becomes empty
+            if (state.ammo <= 0) {
+                startReload();
+            }
+        }
+
+        // Window keyboard listeners
+        window.addEventListener('keydown', (e) => {
+            if (currentMode !== 'attack') return;
+
+            if (e.key === 'Tab') {
+                e.preventDefault(); // Stop default browser tab navigation
+                const weapons = ['SM-2', '12.7mm', '5.56mm'];
+                let nextIdx = (weapons.indexOf(currentWeapon) + 1) % weapons.length;
+                selectWeapon(weapons[nextIdx]);
+            }
+
+            if (e.key === ' ') { // Spacebar for firing
+                e.preventDefault(); // Stop page scrolling
+                fireWeapon();
+            }
+
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'r' || e.key === 'R') {
+                if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+                    e.preventDefault(); // Stop page scrolling
+                }
+                keysPressed[e.key] = true;
+
+                // Manual reload
+                if (e.key.toLowerCase() === 'r') {
+                    startReload();
+                }
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (currentMode !== 'attack') return;
+            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'r' || e.key === 'R') {
+                keysPressed[e.key] = false;
+            }
+        });
+
+        // Sector Sweep settings
+        const minAngle = -140 * Math.PI / 180; // Start sweep angle
+        const maxAngle = -40 * Math.PI / 180;  // End sweep angle
+        let sweepAngle = minAngle;
+        let sweepDirection = 1; // 1 = clockwise, -1 = counter-clockwise
+        const sweepSpeed = 0.015;
+
+        // List of tracked targets
+        let targets = {};
+        let alarmThresholdRatio = 0.5; // Default 50%
+        // Expose function for Python to inject data
+        window.updateData = function (data) {
+            if (!data || data.cx === undefined) return;
+
+            const targetId = data.id || `target_${data.type}`;
+            const normX = data.cx / 320.0;
+            const targetAngle = minAngle + (maxAngle - minAngle) * normX;
+
+            const screenArea = 320 * 240; // 76800
+            const size = Math.max(1, data.w * data.h);
+            const sizeRatio = size / screenArea;
+
+            let targetDistance;
+            if (sizeRatio >= 0.05) {
+                // 크기가 전체 화면의 5% 이상이면 가까이 온 것(임계 위협 구역)으로 판정
+                // alarmThresholdRatio가 0.5이므로, 0.5 * radarRadius 이하로 거리 지정
+                const ratioNorm = Math.min(1.0, (sizeRatio - 0.05) / 0.95);
+                targetDistance = radarRadius * (0.50 - ratioNorm * 0.40);
+            } else {
+                // 5% 미만인 경우 경고 구역(0.5 ~ 0.95)으로 점진적 거리 표현
+                const ratioNorm = sizeRatio / 0.05;
+                targetDistance = radarRadius * (0.95 - ratioNorm * 0.45);
+            }
+
+            const now = Date.now();
+
+            if (!targets[targetId]) {
+                targets[targetId] = {
+                    id: targetId,
+                    type: data.type,
+                    cx: data.cx,
+                    cy: data.cy,
+                    w: data.w,
+                    h: data.h,
+                    angle: targetAngle,
+                    distance: targetDistance,
+                    smoothedAngle: targetAngle,
+                    smoothedDist: targetDistance,
+                    lastSeen: now,
+                    proximityPenaltyDeducted: false
+                };
+            } else {
+                const t = targets[targetId];
+                t.cx = data.cx;
+                t.cy = data.cy;
+                t.w = data.w;
+                t.h = data.h;
+                t.angle = targetAngle;
+                t.distance = targetDistance;
+                t.lastSeen = now;
+            }
+        };
+
+        // Expose function for Python to push entire frames of targets (EOF-delimited)
+        window.updateDataList = function (dataList) {
+            if (!dataList || !Array.isArray(dataList)) return;
+
+            const now = Date.now();
+
+            dataList.forEach((data, index) => {
+                if (data.eof === 1) return; // eof가 1인 패킷은 레이더/UI 그리기에서 제외
+
+                const normX = data.cx / 320.0;
+                const targetAngle = minAngle + (maxAngle - minAngle) * normX;
+
+                const screenArea = 320 * 240; // 76800
+                const size = Math.max(1, data.w * data.h);
+                const sizeRatio = size / screenArea;
+
+                let targetDistance;
+                if (sizeRatio >= 0.05) {
+                    // 크기가 전체 화면의 5% 이상이면 가까이 온 것(임계 위협 구역)으로 판정
+                    // alarmThresholdRatio가 0.5이므로, 0.5 * radarRadius 이하로 거리 지정
+                    const ratioNorm = Math.min(1.0, (sizeRatio - 0.05) / 0.95);
+                    targetDistance = radarRadius * (0.50 - ratioNorm * 0.40);
+                } else {
+                    // 5% 미만인 경우 경고 구역(0.5 ~ 0.95)으로 점진적 거리 표현
+                    const ratioNorm = sizeRatio / 0.05;
+                    targetDistance = radarRadius * (0.95 - ratioNorm * 0.45);
+                }
+
+                // 근접도 기반 기존 타겟 탐색 및 매칭 (320x240 좌표계 기준 거리 60픽셀 이내)
+                let matchedId = null;
+                let minDistance = 999999;
+
+                for (let id in targets) {
+                    const t = targets[id];
+                    if (t.type === data.type && (now - t.lastSeen < 2000)) {
+                        const dist = Math.hypot(t.cx - data.cx, t.cy - data.cy);
+                        if (dist < 60 && dist < minDistance) {
+                            minDistance = dist;
+                            matchedId = id;
+                        }
+                    }
+                }
+
+                const targetId = matchedId || `target_${data.type}_${now}_${Math.floor(Math.random() * 1000)}`;
+                let smoothedAngle = targetAngle;
+                let smoothedDist = targetDistance;
+                let proximityPenaltyDeducted = false;
+
+                // 매칭된 타겟이 있으면 보간용 smoothed 값 복사
+                if (targets[targetId]) {
+                    smoothedAngle = targets[targetId].smoothedAngle;
+                    smoothedDist = targets[targetId].smoothedDist;
+                    proximityPenaltyDeducted = !!targets[targetId].proximityPenaltyDeducted;
+                }
+
+                targets[targetId] = {
+                    id: targetId,
+                    type: data.type,
+                    cx: data.cx,
+                    cy: data.cy,
+                    w: data.w,
+                    h: data.h,
+                    angle: targetAngle,
+                    distance: targetDistance,
+                    smoothedAngle: smoothedAngle,
+                    smoothedDist: smoothedDist,
+                    lastSeen: now,
+                    stable: data.stable,
+                    proximityPenaltyDeducted: proximityPenaltyDeducted
+                };
+            });
+        };
+
+        // Expose function for Python to push OpenCV video frames as base64
+        window.updateCameraFrame = function (base64Data) {
+            const img = document.getElementById('cameraStream');
+            const placeholder = document.getElementById('cameraPlaceholder');
+            if (base64Data) {
+                img.src = "data:image/jpeg;base64," + base64Data;
+                img.style.display = "block";
+                placeholder.style.display = "none";
+            } else {
+                img.style.display = "none";
+                placeholder.style.display = "flex";
+            }
+        };
+
+        // Handle camera dropdown change
+        window.onCameraChange = function (index) {
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.change_camera(index)
+                    .then(response => {
+                        console.log("카메라 변경 완료:", response);
+                    })
+                    .catch(err => {
+                        console.error("카메라 변경 에러:", err);
+                    });
+            }
+        };
+
+        function toggleSimulator() {
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.toggle_simulator();
+            }
+        }
+
+        // Draw the fan-shaped sector grid
+        function drawRadarGrid() {
+            ctx.save();
+
+            // Draw Sector background
+            ctx.beginPath();
+            ctx.moveTo(originX, originY);
+            ctx.arc(originX, originY, radarRadius, minAngle, maxAngle);
+            ctx.closePath();
+            ctx.fillStyle = '#020706';
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(0, 255, 102, 0.4)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Draw Concentric Green Grid Arcs
+            ctx.strokeStyle = 'rgba(0, 255, 102, 0.12)';
+            ctx.lineWidth = 1;
+            const gridIntervals = [0.25, 0.5, 0.75, 1.0];
+            gridIntervals.forEach(factor => {
+                ctx.beginPath();
+                ctx.arc(originX, originY, radarRadius * factor, minAngle, maxAngle);
+                ctx.stroke();
+            });
+
+            // Draw Alarm Threshold Boundary Circle (Dashed Red Line)
+            ctx.strokeStyle = 'rgba(255, 51, 51, 0.45)';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([4, 4]);
+            ctx.beginPath();
+            ctx.arc(originX, originY, radarRadius * alarmThresholdRatio, minAngle, maxAngle);
+            ctx.stroke();
+            ctx.setLineDash([]); // Reset line dash
+
+            // Draw radial lines
+            const radialAngles = [-120, -100, -80, -60];
+            radialAngles.forEach(deg => {
+                const rad = deg * Math.PI / 180;
+                ctx.beginPath();
+                ctx.moveTo(originX, originY);
+                ctx.lineTo(
+                    originX + Math.cos(rad) * radarRadius,
+                    originY + Math.sin(rad) * radarRadius
+                );
+                ctx.stroke();
+            });
+
+            ctx.restore();
+        }
+
+        // Draw the rotating sweep beam
+        function drawSweepBeam() {
+            ctx.save();
+            // Update sweep angle
+            sweepAngle += sweepDirection * sweepSpeed;
+            if (sweepAngle >= maxAngle) {
+                sweepAngle = maxAngle;
+                sweepDirection = -1;
+            } else if (sweepAngle <= minAngle) {
+                sweepAngle = minAngle;
+                sweepDirection = 1;
+            }
+
+            // Draw sweep gradient beam
+            const gradient = ctx.createRadialGradient(originX, originY, 10, originX, originY, radarRadius);
+            gradient.addColorStop(0, 'rgba(0, 255, 102, 0.15)');
+            gradient.addColorStop(0.8, 'rgba(0, 255, 102, 0.03)');
+            gradient.addColorStop(1, 'rgba(0, 255, 102, 0)');
+
+            ctx.beginPath();
+            ctx.moveTo(originX, originY);
+            // Draw a narrow sector for the beam trail
+            ctx.arc(originX, originY, radarRadius, sweepAngle - (sweepDirection * 0.15), sweepAngle);
+            ctx.closePath();
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            // Sweep line
+            ctx.strokeStyle = 'rgba(0, 255, 102, 0.3)';
+            ctx.lineWidth = 1.2;
+            ctx.shadowBlur = 3;
+            ctx.shadowColor = 'rgba(0, 255, 102, 0.4)';
+            ctx.beginPath();
+            ctx.moveTo(originX, originY);
+            ctx.lineTo(
+                originX + Math.cos(sweepAngle) * radarRadius,
+                originY + Math.sin(sweepAngle) * radarRadius
+            );
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // Draw targets (triangles pointing to origin)
+        function drawTargets() {
+            const now = Date.now();
+            let hasEnemy = false;
+            let hasCriticalEnemy = false;
+            let activeCount = 0;
+
+            for (let id in targets) {
+                const t = targets[id];
+
+                // Remove target if inactive for more than 2.0 seconds
+                if (now - t.lastSeen > 2000) {
+                    delete targets[id];
+                    continue;
+                }
+
+                if (t.stable === 1) {
+                    activeCount++;
+                    if (t.type === 0) {
+                        hasEnemy = true;
+                        // If enemy distance is within the dynamic alarm threshold
+                        if (t.smoothedDist <= radarRadius * alarmThresholdRatio) {
+                            hasCriticalEnemy = true;
+                            
+                            // If in attack mode and proximity penalty not yet deducted for this target
+                            if (currentMode === 'attack' && !t.proximityPenaltyDeducted) {
+                                t.proximityPenaltyDeducted = true;
+                                score = Math.max(0, score - 10);
+                                document.getElementById('scoreValue').innerText = score;
+                                
+                                // Push floating red text on radar at target position
+                                const tx = originX + Math.cos(t.smoothedAngle) * t.smoothedDist;
+                                const ty = originY + Math.sin(t.smoothedAngle) * t.smoothedDist;
+                                activeHits.push({
+                                    x: tx,
+                                    y: ty,
+                                    text: '-10 (근무태만)',
+                                    startTime: now,
+                                    duration: 1000,
+                                    isMiss: true, // Only show text, skip shockwave & spark
+                                    textColor: 'rgba(255, 51, 51, ALPHA)',
+                                    shadowColor: '#ff3333'
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // Interpolate positioning for smooth movement (Increased coefficient from 0.1 to 0.5 for instant response)
+                t.smoothedAngle += (t.angle - t.smoothedAngle) * 0.5;
+                t.smoothedDist += (t.distance - t.smoothedDist) * 0.5;
+
+                // Coordinate conversion
+                const tx = originX + Math.cos(t.smoothedAngle) * t.smoothedDist;
+                const ty = originY + Math.sin(t.smoothedAngle) * t.smoothedDist;
+
+                // Draw Triangle pointing to origin
+                ctx.save();
+                ctx.translate(tx, ty);
+                // Rotate to face the origin
+                const angleToOrigin = Math.atan2(originY - ty, originX - tx);
+                ctx.rotate(angleToOrigin);
+
+                // Set theme based on friendly/enemy (Direct color hex code for HTML Canvas context)
+                // 0 = 적군 (red), 1 = 우군 (blue)
+                const color = t.type === 0 ? '#ff3333' : '#00d2ff';
+                const glow = t.type === 0 ? 'rgba(255, 51, 51, 0.4)' : 'rgba(0, 210, 255, 0.4)';
+
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = color;
+
+                if (t.stable === 1) {
+                    // 다수 인식된 경우는 채워진 삼각형
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    ctx.moveTo(8, 0);
+                    ctx.lineTo(-6, -6);
+                    ctx.lineTo(-6, 6);
+                    ctx.closePath();
+                    ctx.fill();
+                } else {
+                    // 한번씩 짧게 인식된 경우는 동그라미 테두리로만 표현
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 2.5;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 7, 0, 2 * Math.PI);
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            }
+
+            // Update Header Warning Banner
+            const banner = document.getElementById('enemyAlertBanner');
+            if (hasEnemy) {
+                banner.classList.add('active');
+                if (hasCriticalEnemy) {
+                    banner.classList.add('critical');
+                    banner.innerText = "★ DANGER: ENEMY CRITICAL APPROACH !! ★";
+                } else {
+                    banner.classList.remove('critical');
+                    banner.innerText = "ENEMY DETECT !!";
+                }
+            } else {
+                banner.classList.remove('active');
+                banner.classList.remove('critical');
+            }
+
+            // Update list panel
+            updateTargetListPanel(activeCount);
+        }
+
+        // Update the right side dynamic lists
+        function updateTargetListPanel(activeCount) {
+            const enemyListEl = document.getElementById('enemyTargetList');
+            const friendlyListEl = document.getElementById('friendlyTargetList');
+            document.getElementById('targetCount').innerText = `ACTIVE: ${activeCount}`;
+
+            // Empty and rebuild both lists
+            enemyListEl.innerHTML = '';
+            friendlyListEl.innerHTML = '';
+
+            const template = document.getElementById('droneSvgTemplate');
+
+            for (let id in targets) {
+                const t = targets[id];
+
+                // 동그라미(단발성) 타겟은 리스트 패널 목록에서 제외
+                if (t.stable !== 1) continue;
+
+                const card = document.createElement('div');
+                card.className = `target-card ${t.type === 0 ? 'enemy' : 'friendly'}`;
+
+                // Drone Icon SVG
+                const iconContainer = document.createElement('div');
+                iconContainer.className = 'drone-icon-container';
+                iconContainer.appendChild(template.content.cloneNode(true));
+                card.appendChild(iconContainer);
+
+                // Info Section
+                const info = document.createElement('div');
+                info.className = 'target-info';
+
+                // Calculate danger level & distance
+                const distMeters = Math.round(t.smoothedDist * 0.5); // Mock calibration
+                const dangerText = t.type === 0
+                    ? (distMeters < 100 ? "CRITICAL (접근 위험!)" : "WARNING (추적 중)")
+                    : "SAFE (우군 기기)";
+
+                info.innerHTML = `
+                    <div class="info-row">
+                        <span class="info-label">ID / TYPE</span>
+                        <span class="info-value status">${t.type === 0 ? 'ENEMY_DRONE_A' : 'FRIENDLY_B'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">접근 위험</span>
+                        <span class="info-value">${dangerText}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">위치 좌표</span>
+                        <span class="info-value">X:${t.cx}, Y:${t.cy}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">기기 크기</span>
+                        <span class="info-value">W:${t.w}, H:${t.h}</span>
+                    </div>
+                `;
+
+                card.appendChild(info);
+
+                // Append card to correct section based on drone type
+                if (t.type === 0) {
+                    enemyListEl.appendChild(card);
+                } else {
+                    friendlyListEl.appendChild(card);
+                }
+            }
+        }
+
+        // Draw aiming line in attack mode
+        function drawAimingLine() {
+            ctx.save();
+            ctx.strokeStyle = '#eab308'; // Yellow-amber color for weapon sight
+            ctx.lineWidth = 2.5;
+            ctx.setLineDash([8, 8]);
+            ctx.beginPath();
+            ctx.moveTo(originX, originY);
+            ctx.lineTo(
+                originX + Math.cos(aimingAngle) * radarRadius,
+                originY + Math.sin(aimingAngle) * radarRadius
+            );
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // Draw firing laser/bullet trajectories
+        function drawWeaponFires() {
+            const now = Date.now();
+            activeFires = activeFires.filter(f => now - f.startTime < f.duration);
+
+            activeFires.forEach(f => {
+                const elapsed = now - f.startTime;
+                const progress = elapsed / f.duration;
+
+                ctx.save();
+
+                if (f.weapon === 'SM-2') {
+                    // Thick energy laser beam with fade-out
+                    ctx.strokeStyle = f.config.traceColor;
+                    ctx.lineWidth = f.config.traceWidth * (1 - progress);
+                    ctx.shadowBlur = 20;
+                    ctx.shadowColor = f.config.traceColor;
+
+                    ctx.beginPath();
+                    ctx.moveTo(f.startX, f.startY);
+                    ctx.lineTo(f.endX, f.endY);
+                    ctx.stroke();
+
+                    // Bright projectile core traveling towards endpoint
+                    const projX = f.startX + (f.endX - f.startX) * progress;
+                    const projY = f.startY + (f.endY - f.startY) * progress;
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(projX, projY, 5, 0, 2 * Math.PI);
+                    ctx.fill();
+                } else {
+                    // Rapid machine gun / rifle bullets
+                    ctx.strokeStyle = f.config.traceColor;
+                    ctx.lineWidth = f.config.traceWidth;
+                    ctx.globalAlpha = 1 - progress;
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = f.config.traceColor;
+
+                    const bulletX1 = f.startX + (f.endX - f.startX) * progress;
+                    const bulletY1 = f.startY + (f.endY - f.startY) * progress;
+                    const bulletX2 = f.startX + (f.endX - f.startX) * Math.max(0, progress - 0.2);
+                    const bulletY2 = f.startY + (f.endY - f.startY) * Math.max(0, progress - 0.2);
+
+                    ctx.beginPath();
+                    ctx.moveTo(bulletX2, bulletY2);
+                    ctx.lineTo(bulletX1, bulletY1);
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            });
+        }
+
+        // Draw hit explosions and floating score points
+        function drawHits() {
+            const now = Date.now();
+            activeHits = activeHits.filter(h => now - h.startTime < h.duration);
+
+            activeHits.forEach(h => {
+                const elapsed = now - h.startTime;
+                const progress = elapsed / h.duration;
+
+                ctx.save();
+
+                // 1. Draw shockwave ring (only if not a miss or proximity alert)
+                if (!h.isMiss) {
+                    const maxRadius = 30;
+                    const radius = maxRadius * progress;
+                    ctx.strokeStyle = `rgba(255, 100, 0, ${1 - progress})`;
+                    ctx.lineWidth = 2.5;
+                    ctx.beginPath();
+                    ctx.arc(h.x, h.y, radius, 0, 2 * Math.PI);
+                    ctx.stroke();
+
+                    // 2. Draw inner white flash spark
+                    ctx.fillStyle = `rgba(255, 255, 255, ${1 - progress})`;
+                    ctx.beginPath();
+                    ctx.arc(h.x, h.y, 8 * (1 - progress), 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+
+                // 3. Draw floating score indicators
+                let textColor = `rgba(0, 255, 102, ${1 - progress})`;
+                let shadowColor = '#00ff66';
+                if (h.textColor) {
+                    textColor = h.textColor.replace('ALPHA', 1 - progress);
+                    shadowColor = h.shadowColor || '#ff3333';
+                }
+                ctx.fillStyle = textColor;
+                ctx.font = 'bold 15px "Share Tech Mono", monospace';
+                ctx.textAlign = 'center';
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = shadowColor;
+                const floatY = h.y - 25 * progress;
+                ctx.fillText(h.text, h.x, floatY);
+
+                ctx.restore();
+            });
+        }
+
+        // Update all reloading progress bars and status
+        function updateReloadState() {
+            const reloadBar = document.getElementById('reloadBarContainer');
+            const now = Date.now();
+            let activeReloadingFound = false;
+
+            for (let w in weaponStates) {
+                const state = weaponStates[w];
+                if (state.reloading) {
+                    const elapsed = now - state.reloadStartTime;
+                    const pct = elapsed / state.reloadDuration;
+
+                    if (pct >= 1.0) {
+                        state.ammo = state.maxAmmo;
+                        state.reloading = false;
+                        updateWeaponTabsUI();
+                    } else if (w === currentWeapon) {
+                        activeReloadingFound = true;
+                        reloadBar.style.display = 'flex';
+                        document.getElementById('reloadWeaponName').innerText = w;
+                        document.getElementById('reloadProgress').style.width = `${pct * 100}%`;
+                    }
+                }
+            }
+
+            if (!activeReloadingFound) {
+                reloadBar.style.display = 'none';
+            }
+        }
+
+        // Main Animation loop
+        function mainLoop() {
+            // Smooth keyboard-controlled rotation for aiming line (dynamic per weapon speed)
+            const rotationSpeed = weaponConfigs[currentWeapon].rotationSpeed;
+            if (currentMode === 'attack') {
+                if (keysPressed['ArrowLeft'] || keysPressed['Left']) {
+                    aimingAngle -= rotationSpeed;
+                    if (aimingAngle < minAngle) aimingAngle = minAngle;
+                }
+                if (keysPressed['ArrowRight'] || keysPressed['Right']) {
+                    aimingAngle += rotationSpeed;
+                    if (aimingAngle > maxAngle) aimingAngle = maxAngle;
+                }
+            }
+
+            // Update weapon reloading states
+            updateReloadState();
+
+            // Draw background
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw grid elements
+            drawRadarGrid();
+
+            // Draw sweep beam
+            drawSweepBeam();
+
+            // Draw aiming sight line in Attack Mode
+            if (currentMode === 'attack') {
+                drawAimingLine();
+            }
+
+            // Draw firing traces and explosions
+            drawWeaponFires();
+            drawHits();
+
+            // Draw all active targets
+            drawTargets();
+
+            requestAnimationFrame(mainLoop);
+        }
+
+        // Initialize HUD display (starts as Monitoring mode)
+        setMode('monitor');
+
+        mainLoop();
+    </script>
+</body>
+
+</html>
